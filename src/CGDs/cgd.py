@@ -92,10 +92,31 @@ class BCGD(object):
         time_step = self.state['step'] + 1
         self.state['step'] = time_step
 
+        
+        grad_x = autograd.grad(loss, self.max_params, create_graph=True, # retain_graph=True, 
+            allow_unused= True)
+        grad_x_vec = torch.cat([g.contiguous().view(-1) for g in grad_x])
+        grad_y = autograd.grad(loss, self.min_params, create_graph=True, # retain_graph=True, 
+            allow_unused= True)
+        grad_y_vec = None
+        for g in grad_y:
+            if grad_y_vec == None:
+                if g != None:
+                    grad_y_vec = g.contiguous().view(-1).to(g.device)
+                else:
+                    grad_y_vec = torch.zeros(1).to(loss.device)
+            else:
+                if g != None:
+                    grad_y_vec = torch.cat([grad_y_vec, g.contiguous().view(-1)])
+                else:
+                    grad_y_vec = torch.cat([grad_y_vec, torch.zeros(1).to(loss.device)])
+
+        '''
         grad_x = autograd.grad(loss, self.max_params, create_graph=True, retain_graph=True)
         grad_x_vec = torch.cat([g.contiguous().view(-1) for g in grad_x])
         grad_y = autograd.grad(loss, self.min_params, create_graph=True, retain_graph=True)
         grad_y_vec = torch.cat([g.contiguous().view(-1) for g in grad_y])
+        '''
         grad_x_vec_d = grad_x_vec.clone().detach()
         grad_y_vec_d = grad_y_vec.clone().detach()
 
