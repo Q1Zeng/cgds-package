@@ -114,7 +114,7 @@ def Hvp_vec(grad_vec, params, vec,
         hvp = vectorize_grad(params)
     else:
         grad_grad = autograd.grad(grad_vec, params, grad_outputs=vec,
-                                  retain_graph=retain_graph, create_graph=True,
+                                  retain_graph=retain_graph, create_graph=False,
                                   allow_unused=True)
         grad_list = []
         for i, p in enumerate(params):
