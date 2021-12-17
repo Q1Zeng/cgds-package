@@ -83,10 +83,7 @@ class ACGD(object):
         grad_x_vec_d = reduce_mean(grad_x_vec_d)
         grad_y_vec_d = reduce_mean(grad_y_vec_d)
         
-        print(type(grad_x_vec_d))
-        print(grad_x_vec_d)        
-        print(type(grad_x_vec))
-        print(grad_x_vec)
+
         
         sq_avg_x = self.state['sq_exp_avg_max']
         sq_avg_y = self.state['sq_exp_avg_min']
