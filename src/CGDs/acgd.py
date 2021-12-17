@@ -11,7 +11,7 @@ from .cgd_utils import zero_grad, general_conjugate_gradient, Hvp_vec
 class ACGD(object):
     def __init__(self, max_params, min_params,
                  max_reducer=None, min_reducer=None,
-                 lr_max=1e-3, lr_min=1e-3,
+                 lr_max=1e-3, lr_min=1e-3, device=torch.device('cpu'),
                  backward_mode=False,
                  eps=1e-5, beta=0.99,
                  tol=1e-12, atol=1e-20,
@@ -23,7 +23,7 @@ class ACGD(object):
         self.min_params = list(min_params)
         self.state = {'lr_max': lr_max, 'lr_min': lr_min,
                       'eps': eps, 'solve_x': solve_x,
-                      'tol': tol, 'atol': atol,
+                      'tol': tol, 'atol': atol, 
                       'beta': beta, 'step': 0,
                       'old_max': None, 'old_min': None,  # start point of CG
                       'sq_exp_avg_max': None, 'sq_exp_avg_min': None}  # save last update
@@ -31,6 +31,7 @@ class ACGD(object):
                      'hvp_x': None, 'hvp_y': None,
                      'cg_x': None, 'cg_y': None,
                      'time': 0, 'iter_num': 0}
+        self.device = device
         self.collect_info = collect_info
 
     def zero_grad(self):
@@ -81,7 +82,12 @@ class ACGD(object):
         # reduce leaf nodes across all devices
         grad_x_vec_d = reduce_mean(grad_x_vec_d)
         grad_y_vec_d = reduce_mean(grad_y_vec_d)
-
+        
+        print(type(grad_x_vec_d))
+        print(grad_x_vec_d)        
+        print(type(grad_x_vec))
+        print(grad_x_vec)
+        
         sq_avg_x = self.state['sq_exp_avg_max']
         sq_avg_y = self.state['sq_exp_avg_min']
         sq_avg_x = torch.zeros_like(grad_x_vec_d, requires_grad=False) if sq_avg_x is None else sq_avg_x
