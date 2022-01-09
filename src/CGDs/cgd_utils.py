@@ -160,6 +160,7 @@ def general_conjugate_gradient(grad_x, grad_y,
     :param atol: absolute tolerance of the residual
     :return: (I + sqrt(lr_x) * D_xy * lr_y * D_yx * sqrt(lr_x)) ** -1 * b
     '''
+    hvp_count = 0
     lr_x = lr_x.sqrt()
     if nsteps is None:
         nsteps = b.shape[0]
@@ -177,51 +178,13 @@ def general_conjugate_gradient(grad_x, grad_y,
                      retain_graph=True,
                      trigger=trigger, reducer=x_reducer,
                      rebuild=rebuild).mul_(lr_x)
+        hvp_count += 2
         Avx = x + h2
         r = b.clone() - Avx
         nsteps -= 1
 
     if grad_x.shape != b.shape:
         raise RuntimeError('CG: hessian vector product shape mismatch')
-        
-    # #calculate eigenvalues
-    # x0 = torch.ones_like(x) #initial guess
-    # D_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=x0, retain_graph=True).detach_() #D_yx * x0
-    # D_yx = D_yx / D_yx.max()
-    # # print(f"D_yx: {D_yx}")
-
-    # D_xy_D_yx = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yx, retain_graph=True).detach_() #D_xy * D_yx * x0
-    # D_xy_D_yx = D_xy_D_yx / D_xy_D_yx.max()
-    # # print(f"D_xy_D_yx: {D_xy_D_yx}")
-
-    # temp = D_xy_D_yx
-    # print("starting calculating eigenValues")
-    # for i in range(50):
-    #   tempD_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=temp, retain_graph=True).detach_() #D_yx * (D_xy*D_yx*x0)
-    #   tempNew = Hvp_vec(grad_vec=grad_y, params=x_params, vec=tempD_yx, retain_graph=True).detach_() #D_xy * D_yx * (D_xy*D_yx*x0), target
-
-    #   # print(f"tempNew.shape: {tempNew.shape}")
-    #   normalizedTempNew = tempNew / tempNew.max() #normalize
-    #   normalizedTempOld = temp / temp.max()
-    #   # print(f"normalizedTempNew: {normalizedTempNew}")
-    #   # print(f"normalizedTempOld: {normalizedTempOld}")
-
-    #   print("unscaled tempNew: ", tempNew)
-      
-    #   offBy = abs(torch.norm(normalizedTempNew - normalizedTempOld, 2) / torch.norm(normalizedTempOld, 2))
-    #   # print(f"at {i}, the relative norm is off by {offBy}")
-    #   if offBy < 0.0001:
-    #     # print(tempNew)
-    #     # print(temp)
-    #     D_yxEig = Hvp_vec(grad_vec=grad_x, params=y_params, vec=normalizedTempNew, retain_graph=True).detach_() # D_yx * eigenVector
-    #     Ax = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yxEig, retain_graph=True).detach_() #D_xy * D_yx * eigenVector
-    #     eigenVal = Ax.dot(normalizedTempNew) / normalizedTempNew.dot(normalizedTempNew)
-
-    #     print(f"at {i}, we found the (normalized) eigenvector {normalizedTempNew}, the eigenvalue is {eigenVal}. Ax: {Ax}, calculated as: {normalizedTempNew * eigenVal}")
-    #     break
-    #   temp = tempNew
-    #   if i == 49:
-    #     print(f"power method did not converge at i = {i}")
 
     p = r.clone().detach()
     rdotr = torch.dot(r, r)
@@ -239,6 +202,7 @@ def general_conjugate_gradient(grad_x, grad_y,
                       retain_graph=True,
                       trigger=trigger, reducer=x_reducer,
                       rebuild=rebuild).mul_(lr_x)
+        hvp_count += 2
         Avp_ = p + h_2
 
         alpha = rdotr / torch.dot(p, Avp_)
@@ -252,48 +216,47 @@ def general_conjugate_gradient(grad_x, grad_y,
         p = r + beta * p
     if i > 100:
         warnings.warn('CG iter num: %d' % (i + 1))
-#         torch.set_default_dtype(torch.double)
-
-#         # calculate eigenvalues
-#         x0 = torch.ones_like(x) #initial guess
-#         D_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=x0, retain_graph=True).detach_() #D_yx * x0
-#         D_yx = D_yx / D_yx.max()
-#         print(f"D_yx: {D_yx}")
-
-#         D_xy_D_yx = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yx, retain_graph=True).detach_() #D_xy * D_yx * x0
-#         D_xy_D_yx = D_xy_D_yx / D_xy_D_yx.max()
-#         print(f"D_xy_D_yx: {D_xy_D_yx}")
-
-#         temp = D_xy_D_yx
-#         print(f"iter_num = {i}, starting calculating eigenValues")
-#         max_iter_pow = 500
-#         for n in range(max_iter_pow):
-#           tempD_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=temp, retain_graph=True).detach_() #D_yx * (D_xy*D_yx*x0)
-#           tempNew = Hvp_vec(grad_vec=grad_y, params=x_params, vec=tempD_yx, retain_graph=True).detach_() #D_xy * D_yx * (D_xy*D_yx*x0), target
-
-#           # print(f"tempNew.shape: {tempNew.shape}")
-#           normalizedTempNew = tempNew / tempNew.max() #normalize
-#           normalizedTempOld = temp / temp.max()
-#           # print(f"normalizedTempNew: {normalizedTempNew}")
-#           # print(f"normalizedTempOld: {normalizedTempOld}")
-
-#           print("unscaled tempNew: ", tempNew)
-          
-#           offBy = abs(torch.norm(normalizedTempNew - normalizedTempOld, 2) / torch.norm(normalizedTempOld, 2))
-#           # print(f"at {i}, the relative norm is off by {offBy}")
-#           if offBy < 0.001:
-#             # print(tempNew)
-#             # print(temp)
-#             D_yxEig = Hvp_vec(grad_vec=grad_x, params=y_params, vec=normalizedTempNew, retain_graph=True).detach_() # D_yx * eigenVector
-#             Ax = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yxEig, retain_graph=True).detach_() #D_xy * D_yx * eigenVector
-#             eigenVal = Ax.dot(normalizedTempNew) / normalizedTempNew.dot(normalizedTempNew)
-
-#             print(f"at {n}'th power iteration, we found the (normalized) eigenvector {normalizedTempNew}, the eigenvalue is {eigenVal}. Ax: {Ax}, calculated as: {normalizedTempNew * eigenVal}")
-#             break
-#           temp = tempNew
-#           if n == max_iter_pow - 1:
-#             print(f"power method did not converge at n = {n}")
-    return x, i + 1
+        #         torch.set_default_dtype(torch.double)
+        #         # calculate eigenvalues
+        #         x0 = torch.ones_like(x) #initial guess
+        #         D_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=x0, retain_graph=True).detach_() #D_yx * x0
+        #         D_yx = D_yx / D_yx.max()
+        #         print(f"D_yx: {D_yx}")
+        
+        #         D_xy_D_yx = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yx, retain_graph=True).detach_() #D_xy * D_yx * x0
+        #         D_xy_D_yx = D_xy_D_yx / D_xy_D_yx.max()
+        #         print(f"D_xy_D_yx: {D_xy_D_yx}")
+        
+        #         temp = D_xy_D_yx
+        #         print(f"iter_num = {i}, starting calculating eigenValues")
+        #         max_iter_pow = 500
+        #         for n in range(max_iter_pow):
+        #           tempD_yx = Hvp_vec(grad_vec=grad_x, params=y_params, vec=temp, retain_graph=True).detach_() #D_yx * (D_xy*D_yx*x0)
+        #           tempNew = Hvp_vec(grad_vec=grad_y, params=x_params, vec=tempD_yx, retain_graph=True).detach_() #D_xy * D_yx * (D_xy*D_yx*x0), target
+        
+        #           # print(f"tempNew.shape: {tempNew.shape}")
+        #           normalizedTempNew = tempNew / tempNew.max() #normalize
+        #           normalizedTempOld = temp / temp.max()
+        #           # print(f"normalizedTempNew: {normalizedTempNew}")
+        #           # print(f"normalizedTempOld: {normalizedTempOld}")
+        
+        #           print("unscaled tempNew: ", tempNew)
+                  
+        #           offBy = abs(torch.norm(normalizedTempNew - normalizedTempOld, 2) / torch.norm(normalizedTempOld, 2))
+        #           # print(f"at {i}, the relative norm is off by {offBy}")
+        #           if offBy < 0.001:
+        #             # print(tempNew)
+        #             # print(temp)
+        #             D_yxEig = Hvp_vec(grad_vec=grad_x, params=y_params, vec=normalizedTempNew, retain_graph=True).detach_() # D_yx * eigenVector
+        #             Ax = Hvp_vec(grad_vec=grad_y, params=x_params, vec=D_yxEig, retain_graph=True).detach_() #D_xy * D_yx * eigenVector
+        #             eigenVal = Ax.dot(normalizedTempNew) / normalizedTempNew.dot(normalizedTempNew)
+        
+        #             print(f"at {n}'th power iteration, we found the (normalized) eigenvector {normalizedTempNew}, the eigenvalue is {eigenVal}. Ax: {Ax}, calculated as: {normalizedTempNew * eigenVal}")
+        #             break
+        #           temp = tempNew
+        #           if n == max_iter_pow - 1:
+        #             print(f"power method did not converge at n = {n}")
+    return x, i + 1, hvp_count
 
 
 def zero_grad(params):
