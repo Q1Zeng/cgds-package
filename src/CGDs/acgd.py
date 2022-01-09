@@ -30,7 +30,7 @@ class ACGD(object):
         self.info = {'grad_x': None, 'grad_y': None,
                      'hvp_x': None, 'hvp_y': None,
                      'cg_x': None, 'cg_y': None,
-                     'time': 0, 'iter_num': 0}
+                     'time': 0, 'iter_num': 0, 'iter_num_sum': 0, 'hvp_count_sum': 0}
         self.device = device
         self.collect_info = collect_info
 
@@ -118,7 +118,7 @@ class ACGD(object):
 
         if self.state['solve_x']:
             p_y.mul_(lr_min.sqrt())
-            cg_y, iter_num = general_conjugate_gradient(grad_x=grad_y_vec,
+            cg_y, iter_num, hvp_count = general_conjugate_gradient(grad_x=grad_y_vec,
                                                         grad_y=grad_x_vec,
                                                         x_params=self.min_params,
                                                         y_params=self.max_params,
@@ -141,7 +141,7 @@ class ACGD(object):
             old_max = hcg.mul(lr_max.sqrt())
         else:
             p_x.mul_(lr_max.sqrt())
-            cg_x, iter_num = general_conjugate_gradient(grad_x=grad_x_vec,
+            cg_x, iter_num, hvp_count = general_conjugate_gradient(grad_x=grad_x_vec,
                                                         grad_y=grad_y_vec,
                                                         x_params=self.max_params,
                                                         y_params=self.min_params,
@@ -167,7 +167,7 @@ class ACGD(object):
 
         if self.collect_info:
             timer = time.time() - timer
-            self.info.update({'time': timer, 'iter_num': iter_num,
+            self.info.update({'time': timer, 'iter_num': iter_num, 'iter_num_sum': self.info['iter_num_sum'] + iter_num, 'hvp_count_sum': self.info['hvp_count_sum'] + hvp_count + 2,
                               'hvp_x': norm_px, 'hvp_y': norm_py})
 
         index = 0
